@@ -59,8 +59,10 @@ USA</p>
 import asyncio
 import sys
 import time
-from serial.tools import list_ports
+
 from serial.serialutil import SerialException
+from serial.tools import list_ports
+
 from tmx_pico_aio.private_constants import PrivateConstants
 from tmx_pico_aio.telemtrix_aio_serial import TelemetrixAioSerial
 
@@ -309,65 +311,6 @@ class TmxPicoAio:
         else:
             print(f&#39;Telemetrix4RPiPico Version Number: {firmware_version[0]}.&#39;
                   f&#39;{firmware_version[1]}&#39;)
-            # start the command dispatcher loop
-            # command = [PrivateConstants.ENABLE_ALL_REPORTS]
-            # await self._send_command(command)
-
-    async def loop_back(self, start_character, callback=None):
-        &#34;&#34;&#34;
-        This is a debugging method to send a character to the
-        pico device, and have the device loop it back.
-
-        :param start_character: The character to loop back. It should be
-                                an integer.
-
-        :param callback: Looped back character will appear in the callback method
-
-        &#34;&#34;&#34;
-        command = [PrivateConstants.LOOP_COMMAND, ord(start_character)]
-        self.loop_back_callback = callback
-        await self._send_command(command)
-
-    async def _pico_report_dispatcher(self):
-        &#34;&#34;&#34;
-        This is a private method.
-        It continually accepts and interprets data coming from Telemetrix4RPiPico,and then
-        dispatches the correct handler to process the data.
-
-        It first receives the length of the packet, and then reads in the rest of the
-        packet. A packet consists of a length, report identifier and then the report data.
-        Using the report identifier, the report handler is fetched from report_dispatch.
-
-        :returns: This method never returns
-        &#34;&#34;&#34;
-
-        while True:
-            if self.shutdown_flag:
-                break
-            try:
-                packet_length = await self.serial_port.read()
-            except TypeError:
-                continue
-            except OSError:
-                break
-
-            # except KeyboardInterrupt:
-            #     await self.shutdown()
-
-            # get the rest of the packet
-            try:
-                packet = await self.serial_port.read(packet_length)
-            except TypeError:
-                continue
-            except OSError:
-                break
-
-            report = packet[0]
-            # handle all other messages by looking them up in the
-            # command dictionary
-
-            await self.report_dispatch[report](packet[1:])
-            await asyncio.sleep(self.sleep_tune)
 
     async def _find_pico(self):
         &#34;&#34;&#34;
@@ -432,52 +375,25 @@ class TmxPicoAio:
 
         return self.firmware_version
 
-    async def _report_loop_data(self, data):
+    async def _get_pico_id(self):
         &#34;&#34;&#34;
-        Print data that was looped back
-        :param data: byte of loop back data
-        :return:
-        &#34;&#34;&#34;
-        if self.loop_back_callback:
-            await self.loop_back_callback(data)
-
-    async def pwm_write(self, pin, duty_cycle=0, raw=False):
-        &#34;&#34;&#34;
-        Set the specified pin to the specified value.
-
-        :param pin: pico GPIO pin number
-
-        :param duty_cycle: if the raw parameter is False, then this is expressed
-                           as a percentage between 0 and 100
-
-                           if the raw parameter is True, then the valid range
-                           of values is from 0 - 19999
-
-       :param raw: Sets how the duty-cycle parameter is perceived.
+        Retrieve pico-telemetrix pico id
 
         &#34;&#34;&#34;
-        if self.pico_pins[pin] != PrivateConstants.AT_PWM_OUTPUT \
-                and self.pico_pins[pin] != PrivateConstants.AT_SERVO:
-            raise RuntimeError(&#39;pwm_write: You must set the pin mode before performing &#39;
-                               &#39;a PWM write.&#39;)
-        if raw:
-            if not (0 &lt;= duty_cycle &lt; PrivateConstants.MAX_RAW_DUTY_CYCLE):
-                raise RuntimeError(&#39;Raw PWM duty cycle out of range&#39;)
-            # else:
-            #     dc = duty_cycle
-        else:
-            if not (0 &lt;= duty_cycle &lt;= 99):
-                raise RuntimeError(&#39;Raw PWM duty cycle percentage of range&#39;)
-            # calculate percentage of duty cycle
-            else:
-                duty_cycle = ((PrivateConstants.MAX_RAW_DUTY_CYCLE * duty_cycle) // 100)
-                # print(duty_cycle)
-
-        value_msb = duty_cycle &gt;&gt; 8
-        value_lsb = duty_cycle &amp; 0x00ff
-
-        command = [PrivateConstants.PWM_WRITE, pin, value_msb, value_lsb]
+        command = [PrivateConstants.RETRIEVE_PICO_UNIQUE_ID]
         await self._send_command(command)
+        # provide time for the reply
+        await asyncio.sleep(.1)
+
+        print(f&#39;Pico Unique ID: {self.reported_pico_id}&#39;)
+
+        if self.pico_instance_id:
+            if self.reported_pico_id != self.pico_instance_id:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(f&#39;Incorrect pico ID: {self.reported_pico_id}&#39;)
+            else:
+                print(&#39;Valid pico ID Found.&#39;)
 
     async def digital_write(self, pin, value):
         &#34;&#34;&#34;
@@ -548,28 +464,93 @@ class TmxPicoAio:
                    PrivateConstants.REPORTING_DIGITAL_ENABLE, pin]
         await self._send_command(command)
 
-    async def _get_pico_id(self):
+    async def get_pico_pins(self):
         &#34;&#34;&#34;
-        Retrieve pico-telemetrix pico id
+        This method returns the pico_pins dictionary
+
+        Pin Modes MAP:
+
+            DIGITAL_INPUT = 0
+
+            DIGITAL_OUTPUT = 1
+
+            PWM_OUTPUT = 2
+
+            DIGITAL_INPUT_PULLUP = 3
+
+            DIGITAL_INPUT_PULL_DOWN = 4
+
+            ANALOG_INPUT = 5
+
+            SERVO = 6
+
+            SONAR = 7
+
+            DHT = 8
+
+            I2C = 9
+
+            NEO_PIXEL = 10
+
+            AT_MODE_NOT_SET = 255
+
+        :return: pico_pins
+        &#34;&#34;&#34;
+        return self.pico_pins
+
+    async def loop_back(self, start_character, callback=None):
+        &#34;&#34;&#34;
+        This is a debugging method to send a character to the
+        pico device, and have the device loop it back.
+
+        :param start_character: The character to loop back. It should be
+                                an integer.
+
+        :param callback: Looped back character will appear in the callback method
 
         &#34;&#34;&#34;
-        command = [PrivateConstants.RETRIEVE_PICO_UNIQUE_ID]
+        command = [PrivateConstants.LOOP_COMMAND, ord(start_character)]
+        self.loop_back_callback = callback
         await self._send_command(command)
-        # provide time for the reply
-        await asyncio.sleep(.1)
 
-        print(f&#39;Pico Unique ID: {self.reported_pico_id}&#39;)
+    async def pwm_write(self, pin, duty_cycle=0, raw=False):
+        &#34;&#34;&#34;
+        Set the specified pin to the specified value.
 
-        if self.pico_instance_id:
-            if self.reported_pico_id != self.pico_instance_id:
-                if self.shutdown_on_exception:
-                    await self.shutdown()
-                raise RuntimeError(f&#39;Incorrect pico ID: {self.reported_pico_id}&#39;)
+        :param pin: pico GPIO pin number
+
+        :param duty_cycle: if the raw parameter is False, then this is expressed
+                           as a percentage between 0 and 100
+
+                           if the raw parameter is True, then the valid range
+                           of values is from 0 - 19999
+
+       :param raw: Sets how the duty-cycle parameter is perceived.
+
+        &#34;&#34;&#34;
+        if self.pico_pins[pin] != PrivateConstants.AT_PWM_OUTPUT \
+                and self.pico_pins[pin] != PrivateConstants.AT_SERVO:
+            raise RuntimeError(&#39;pwm_write: You must set the pin mode before performing &#39;
+                               &#39;a PWM write.&#39;)
+        if raw:
+            if not (0 &lt;= duty_cycle &lt; PrivateConstants.MAX_RAW_DUTY_CYCLE):
+                raise RuntimeError(&#39;Raw PWM duty cycle out of range&#39;)
+        else:
+            if not (0 &lt;= duty_cycle &lt;= 99):
+                raise RuntimeError(&#39;Raw PWM duty cycle percentage of range&#39;)
+            # calculate percentage of duty cycle
             else:
-                print(&#39;Valid pico ID Found.&#39;)
+                duty_cycle = ((PrivateConstants.MAX_RAW_DUTY_CYCLE * duty_cycle) // 100)
+                # print(duty_cycle)
+
+        value_msb = duty_cycle &gt;&gt; 8
+        value_lsb = duty_cycle &amp; 0x00ff
+
+        command = [PrivateConstants.PWM_WRITE, pin, value_msb, value_lsb]
+        await self._send_command(command)
 
     async def i2c_read(self, address, register, number_of_bytes,
-                 callback=None, i2c_port=0, no_stop=False):
+                       callback=None, i2c_port=0, no_stop=False):
         &#34;&#34;&#34;
         Read the specified number of bytes from the specified register for
         the i2c device.
@@ -772,7 +753,7 @@ class TmxPicoAio:
         if not 0 &lt; adc_number &lt; 5:
             raise RuntimeError(&#39;Invalid ADC Number&#39;)
         await self._set_pin_mode(adc_number, PrivateConstants.AT_ANALOG, differential,
-                           callback=callback)
+                                 callback=callback)
 
     async def set_pin_mode_digital_input(self, pin_number, callback=None):
         &#34;&#34;&#34;
@@ -809,7 +790,7 @@ class TmxPicoAio:
 
         &#34;&#34;&#34;
         await self._set_pin_mode(pin_number, PrivateConstants.AT_INPUT_PULLUP,
-                           callback=callback)
+                                 callback=callback)
 
     async def set_pin_mode_digital_input_pull_down(self, pin_number, callback=None):
         &#34;&#34;&#34;
@@ -828,7 +809,7 @@ class TmxPicoAio:
 
         &#34;&#34;&#34;
         await self._set_pin_mode(pin_number, PrivateConstants.AT_INPUT_PULL_DOWN,
-                           callback=callback)
+                                 callback=callback)
 
     async def set_pin_mode_digital_output(self, pin_number):
         &#34;&#34;&#34;
@@ -840,7 +821,7 @@ class TmxPicoAio:
         await self._set_pin_mode(pin_number, PrivateConstants.AT_OUTPUT)
 
     async def set_pin_mode_neopixel(self, pin_number=28, num_pixels=8,
-                              fill_r=0, fill_g=0, fill_b=0):
+                                    fill_r=0, fill_g=0, fill_b=0):
         &#34;&#34;&#34;
         Initialize the pico for NeoPixel control. Fill with rgb values specified.
 
@@ -982,7 +963,7 @@ class TmxPicoAio:
                 f&#39;Maximum Number Of DHTs Exceeded - set_pin_mode_dht fails for pin {pin}&#39;)
 
     # noinspection PyRedundantParentheses
-    def set_pin_mode_servo(self, pin_number, min_pulse=1000, max_pulse=2000):
+    async def set_pin_mode_servo(self, pin_number, min_pulse=1000, max_pulse=2000):
         &#34;&#34;&#34;
 
         Attach a pin to a servo motor
@@ -998,10 +979,11 @@ class TmxPicoAio:
 
         &#34;&#34;&#34;
 
-        self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse, max_pulse)
+        await self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse,
+                               max_pulse)
         self.pico_pins[pin_number] = PrivateConstants.AT_SERVO
 
-    def servo_write(self, pin_number, value):
+    async def servo_write(self, pin_number, value):
         &#34;&#34;&#34;
         Write the value to the specified servo
 
@@ -1024,9 +1006,9 @@ class TmxPicoAio:
         duty_cycle = int(value / 180 * servo_range) + min_duty
 
         # use a raw pwm write from the calculated values
-        self.pwm_write(pin_number, duty_cycle, True)
+        await self.pwm_write(pin_number, duty_cycle, True)
 
-    def set_pin_mode_sonar(self, trigger_pin, echo_pin, callback=None):
+    async def set_pin_mode_sonar(self, trigger_pin, echo_pin, callback=None):
         &#34;&#34;&#34;
         :param trigger_pin:  Sensor trigger gpio pin
 
@@ -1044,7 +1026,7 @@ class TmxPicoAio:
 
         if not callback:
             if self.shutdown_on_exception:
-                self.shutdown()
+                await self.shutdown()
             raise RuntimeError(&#39;set_pin_mode_sonar: A Callback must be specified&#39;)
 
         if self.sonar_count &lt; PrivateConstants.MAX_SONARS:
@@ -1054,48 +1036,14 @@ class TmxPicoAio:
                 PrivateConstants.AT_SONAR
 
             command = [PrivateConstants.SONAR_NEW, trigger_pin, echo_pin]
-            self._send_command(command)
+            await self._send_command(command)
         else:
             if self.shutdown_on_exception:
-                self.shutdown()
+                await self.shutdown()
             raise RuntimeError(&#39;Maximum number of supported sonar devices exceeded.&#39;)
 
-    async def get_pico_pins(self):
-        &#34;&#34;&#34;
-        This method returns the pico_pins dictionary
-
-        Pin Modes MAP:
-
-            DIGITAL_INPUT = 0
-
-            DIGITAL_OUTPUT = 1
-
-            PWM_OUTPUT = 2
-
-            DIGITAL_INPUT_PULLUP = 3
-
-            DIGITAL_INPUT_PULL_DOWN = 4
-
-            ANALOG_INPUT = 5
-
-            SERVO = 6
-
-            SONAR = 7
-
-            DHT = 8
-
-            I2C = 9
-
-            NEO_PIXEL = 10
-
-            AT_MODE_NOT_SET = 255
-
-        :return: pico_pins
-        &#34;&#34;&#34;
-        return self.pico_pins
-
     async def _set_pin_mode(self, pin_number, pin_state, differential=0, value_range=0,
-                      callback=None):
+                            callback=None):
 
         &#34;&#34;&#34;
         A private method to set the various pin modes.
@@ -1225,6 +1173,49 @@ class TmxPicoAio:
         await self._send_command(command)
         await asyncio.sleep(.2)
 
+    async def _pico_report_dispatcher(self):
+        &#34;&#34;&#34;
+        This is a private method.
+        It continually accepts and interprets data coming from Telemetrix4RPiPico,and then
+        dispatches the correct handler to process the data.
+
+        It first receives the length of the packet, and then reads in the rest of the
+        packet. A packet consists of a length, report identifier and then the report data.
+        Using the report identifier, the report handler is fetched from report_dispatch.
+
+        :returns: This method never returns
+        &#34;&#34;&#34;
+
+        while True:
+            if self.shutdown_flag:
+                break
+            try:
+                packet_length = await self.serial_port.read()
+            except TypeError:
+                continue
+            except OSError:
+                break
+            # except AttributeError:
+            #     raise RuntimeError(&#39;Is your USB cable plugged in?&#39;)
+            #     if self.shutdown_on_exception:
+            #         await self.shutdown()
+
+            # get the rest of the packet
+            try:
+                packet = await self.serial_port.read(packet_length)
+            except TypeError:
+                continue
+            except OSError:
+                break
+
+            report = packet[0]
+            # handle all other messages by looking them up in the
+            # command dictionary
+
+            # noinspection PyArgumentList
+            await self.report_dispatch[report](packet[1:])
+            await asyncio.sleep(self.sleep_tune)
+
     async def _analog_message(self, data):
         &#34;&#34;&#34;
         This is a private message handler method.
@@ -1284,7 +1275,7 @@ class TmxPicoAio:
             message = [PrivateConstants.DIGITAL_REPORT, pin, value, time_stamp]
             await self.digital_callbacks[pin](message)
 
-    def _i2c_read_report(self, data):
+    async def _i2c_read_report(self, data):
         &#34;&#34;&#34;
         Execute callback for i2c reads.
 
@@ -1297,35 +1288,40 @@ class TmxPicoAio:
         cb_list.append(time.time())
 
         if cb_list[1]:
-            self.i2c_callback2(cb_list)
+            await self.i2c_callback2(cb_list)
         else:
-            self.i2c_callback(cb_list)
+            await self.i2c_callback(cb_list)
 
-    def _i2c_write_failed(self, data):
+    async def _i2c_write_failed(self, data):
         &#34;&#34;&#34;
         I2c write attempt failed
 
         :param data: data[0] = i2c_device
         &#34;&#34;&#34;
         if self.shutdown_on_exception:
-            self.shutdown()
+            await self.shutdown()
         raise RuntimeError(
             f&#39;i2c Write Failed for I2C port {data[0]}&#39;)
-        while True:
-            time.sleep(1)
 
-    def _i2c_read_failed(self, data):
+    async def _i2c_read_failed(self, data):
         &#34;&#34;&#34;
         I2c read failed
 
         :param data: data[0] = i2c device
         &#34;&#34;&#34;
         if self.shutdown_on_exception:
-            self.shutdown()
+            await self.shutdown()
         raise RuntimeError(
             f&#39;i2c Read Failed for I2C port {data[0]}&#39;)
-        while True:
-            time.sleep(.1)
+
+    async def _report_loop_data(self, data):
+        &#34;&#34;&#34;
+        Print data that was looped back
+        :param data: byte of loop back data
+        :return:
+        &#34;&#34;&#34;
+        if self.loop_back_callback:
+            await self.loop_back_callback(data)
 
     async def _report_unique_id(self, data):
         &#34;&#34;&#34;
@@ -1367,19 +1363,24 @@ class TmxPicoAio:
         command.insert(0, len(command))
         # print(command)
         send_message = bytes(command)
-        await self.serial_port.write(send_message)
+        try:
+            await self.serial_port.write(send_message)
+        except AttributeError:
+            if self.shutdown_on_exception:
+                await self.shutdown()
+            raise RuntimeError(&#39;Is your USB cable plugged in?&#39;)
 
-    def _servo_unavailable(self, report):
+    async def _servo_unavailable(self, report):
         &#34;&#34;&#34;
         Message if no servos are available for use.
         :param report: pin number
         &#34;&#34;&#34;
         if self.shutdown_on_exception:
-            self.shutdown()
+            await self.shutdown()
         raise RuntimeError(
             f&#39;Servo Attach For Pin {report[0]} Failed: No Available Servos&#39;)
 
-    def _sonar_distance_report(self, report):
+    async def _sonar_distance_report(self, report):
         &#34;&#34;&#34;
 
         :param report: data[0] = trigger pin, data[1] and data[2] = distance
@@ -1399,7 +1400,7 @@ class TmxPicoAio:
             cb_list = [PrivateConstants.SONAR_DISTANCE, report[0],
                        (report[1] + (report[2] / 100)), time.time()]
 
-        cb(cb_list)</code></pre>
+        await cb(cb_list)</code></pre>
 </details>
 </section>
 <section>
@@ -1685,65 +1686,6 @@ receiving a KeyboardInterrupt exception</p>
         else:
             print(f&#39;Telemetrix4RPiPico Version Number: {firmware_version[0]}.&#39;
                   f&#39;{firmware_version[1]}&#39;)
-            # start the command dispatcher loop
-            # command = [PrivateConstants.ENABLE_ALL_REPORTS]
-            # await self._send_command(command)
-
-    async def loop_back(self, start_character, callback=None):
-        &#34;&#34;&#34;
-        This is a debugging method to send a character to the
-        pico device, and have the device loop it back.
-
-        :param start_character: The character to loop back. It should be
-                                an integer.
-
-        :param callback: Looped back character will appear in the callback method
-
-        &#34;&#34;&#34;
-        command = [PrivateConstants.LOOP_COMMAND, ord(start_character)]
-        self.loop_back_callback = callback
-        await self._send_command(command)
-
-    async def _pico_report_dispatcher(self):
-        &#34;&#34;&#34;
-        This is a private method.
-        It continually accepts and interprets data coming from Telemetrix4RPiPico,and then
-        dispatches the correct handler to process the data.
-
-        It first receives the length of the packet, and then reads in the rest of the
-        packet. A packet consists of a length, report identifier and then the report data.
-        Using the report identifier, the report handler is fetched from report_dispatch.
-
-        :returns: This method never returns
-        &#34;&#34;&#34;
-
-        while True:
-            if self.shutdown_flag:
-                break
-            try:
-                packet_length = await self.serial_port.read()
-            except TypeError:
-                continue
-            except OSError:
-                break
-
-            # except KeyboardInterrupt:
-            #     await self.shutdown()
-
-            # get the rest of the packet
-            try:
-                packet = await self.serial_port.read(packet_length)
-            except TypeError:
-                continue
-            except OSError:
-                break
-
-            report = packet[0]
-            # handle all other messages by looking them up in the
-            # command dictionary
-
-            await self.report_dispatch[report](packet[1:])
-            await asyncio.sleep(self.sleep_tune)
 
     async def _find_pico(self):
         &#34;&#34;&#34;
@@ -1808,52 +1750,25 @@ receiving a KeyboardInterrupt exception</p>
 
         return self.firmware_version
 
-    async def _report_loop_data(self, data):
+    async def _get_pico_id(self):
         &#34;&#34;&#34;
-        Print data that was looped back
-        :param data: byte of loop back data
-        :return:
-        &#34;&#34;&#34;
-        if self.loop_back_callback:
-            await self.loop_back_callback(data)
-
-    async def pwm_write(self, pin, duty_cycle=0, raw=False):
-        &#34;&#34;&#34;
-        Set the specified pin to the specified value.
-
-        :param pin: pico GPIO pin number
-
-        :param duty_cycle: if the raw parameter is False, then this is expressed
-                           as a percentage between 0 and 100
-
-                           if the raw parameter is True, then the valid range
-                           of values is from 0 - 19999
-
-       :param raw: Sets how the duty-cycle parameter is perceived.
+        Retrieve pico-telemetrix pico id
 
         &#34;&#34;&#34;
-        if self.pico_pins[pin] != PrivateConstants.AT_PWM_OUTPUT \
-                and self.pico_pins[pin] != PrivateConstants.AT_SERVO:
-            raise RuntimeError(&#39;pwm_write: You must set the pin mode before performing &#39;
-                               &#39;a PWM write.&#39;)
-        if raw:
-            if not (0 &lt;= duty_cycle &lt; PrivateConstants.MAX_RAW_DUTY_CYCLE):
-                raise RuntimeError(&#39;Raw PWM duty cycle out of range&#39;)
-            # else:
-            #     dc = duty_cycle
-        else:
-            if not (0 &lt;= duty_cycle &lt;= 99):
-                raise RuntimeError(&#39;Raw PWM duty cycle percentage of range&#39;)
-            # calculate percentage of duty cycle
-            else:
-                duty_cycle = ((PrivateConstants.MAX_RAW_DUTY_CYCLE * duty_cycle) // 100)
-                # print(duty_cycle)
-
-        value_msb = duty_cycle &gt;&gt; 8
-        value_lsb = duty_cycle &amp; 0x00ff
-
-        command = [PrivateConstants.PWM_WRITE, pin, value_msb, value_lsb]
+        command = [PrivateConstants.RETRIEVE_PICO_UNIQUE_ID]
         await self._send_command(command)
+        # provide time for the reply
+        await asyncio.sleep(.1)
+
+        print(f&#39;Pico Unique ID: {self.reported_pico_id}&#39;)
+
+        if self.pico_instance_id:
+            if self.reported_pico_id != self.pico_instance_id:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(f&#39;Incorrect pico ID: {self.reported_pico_id}&#39;)
+            else:
+                print(&#39;Valid pico ID Found.&#39;)
 
     async def digital_write(self, pin, value):
         &#34;&#34;&#34;
@@ -1924,28 +1839,93 @@ receiving a KeyboardInterrupt exception</p>
                    PrivateConstants.REPORTING_DIGITAL_ENABLE, pin]
         await self._send_command(command)
 
-    async def _get_pico_id(self):
+    async def get_pico_pins(self):
         &#34;&#34;&#34;
-        Retrieve pico-telemetrix pico id
+        This method returns the pico_pins dictionary
+
+        Pin Modes MAP:
+
+            DIGITAL_INPUT = 0
+
+            DIGITAL_OUTPUT = 1
+
+            PWM_OUTPUT = 2
+
+            DIGITAL_INPUT_PULLUP = 3
+
+            DIGITAL_INPUT_PULL_DOWN = 4
+
+            ANALOG_INPUT = 5
+
+            SERVO = 6
+
+            SONAR = 7
+
+            DHT = 8
+
+            I2C = 9
+
+            NEO_PIXEL = 10
+
+            AT_MODE_NOT_SET = 255
+
+        :return: pico_pins
+        &#34;&#34;&#34;
+        return self.pico_pins
+
+    async def loop_back(self, start_character, callback=None):
+        &#34;&#34;&#34;
+        This is a debugging method to send a character to the
+        pico device, and have the device loop it back.
+
+        :param start_character: The character to loop back. It should be
+                                an integer.
+
+        :param callback: Looped back character will appear in the callback method
 
         &#34;&#34;&#34;
-        command = [PrivateConstants.RETRIEVE_PICO_UNIQUE_ID]
+        command = [PrivateConstants.LOOP_COMMAND, ord(start_character)]
+        self.loop_back_callback = callback
         await self._send_command(command)
-        # provide time for the reply
-        await asyncio.sleep(.1)
 
-        print(f&#39;Pico Unique ID: {self.reported_pico_id}&#39;)
+    async def pwm_write(self, pin, duty_cycle=0, raw=False):
+        &#34;&#34;&#34;
+        Set the specified pin to the specified value.
 
-        if self.pico_instance_id:
-            if self.reported_pico_id != self.pico_instance_id:
-                if self.shutdown_on_exception:
-                    await self.shutdown()
-                raise RuntimeError(f&#39;Incorrect pico ID: {self.reported_pico_id}&#39;)
+        :param pin: pico GPIO pin number
+
+        :param duty_cycle: if the raw parameter is False, then this is expressed
+                           as a percentage between 0 and 100
+
+                           if the raw parameter is True, then the valid range
+                           of values is from 0 - 19999
+
+       :param raw: Sets how the duty-cycle parameter is perceived.
+
+        &#34;&#34;&#34;
+        if self.pico_pins[pin] != PrivateConstants.AT_PWM_OUTPUT \
+                and self.pico_pins[pin] != PrivateConstants.AT_SERVO:
+            raise RuntimeError(&#39;pwm_write: You must set the pin mode before performing &#39;
+                               &#39;a PWM write.&#39;)
+        if raw:
+            if not (0 &lt;= duty_cycle &lt; PrivateConstants.MAX_RAW_DUTY_CYCLE):
+                raise RuntimeError(&#39;Raw PWM duty cycle out of range&#39;)
+        else:
+            if not (0 &lt;= duty_cycle &lt;= 99):
+                raise RuntimeError(&#39;Raw PWM duty cycle percentage of range&#39;)
+            # calculate percentage of duty cycle
             else:
-                print(&#39;Valid pico ID Found.&#39;)
+                duty_cycle = ((PrivateConstants.MAX_RAW_DUTY_CYCLE * duty_cycle) // 100)
+                # print(duty_cycle)
+
+        value_msb = duty_cycle &gt;&gt; 8
+        value_lsb = duty_cycle &amp; 0x00ff
+
+        command = [PrivateConstants.PWM_WRITE, pin, value_msb, value_lsb]
+        await self._send_command(command)
 
     async def i2c_read(self, address, register, number_of_bytes,
-                 callback=None, i2c_port=0, no_stop=False):
+                       callback=None, i2c_port=0, no_stop=False):
         &#34;&#34;&#34;
         Read the specified number of bytes from the specified register for
         the i2c device.
@@ -2148,7 +2128,7 @@ receiving a KeyboardInterrupt exception</p>
         if not 0 &lt; adc_number &lt; 5:
             raise RuntimeError(&#39;Invalid ADC Number&#39;)
         await self._set_pin_mode(adc_number, PrivateConstants.AT_ANALOG, differential,
-                           callback=callback)
+                                 callback=callback)
 
     async def set_pin_mode_digital_input(self, pin_number, callback=None):
         &#34;&#34;&#34;
@@ -2185,7 +2165,7 @@ receiving a KeyboardInterrupt exception</p>
 
         &#34;&#34;&#34;
         await self._set_pin_mode(pin_number, PrivateConstants.AT_INPUT_PULLUP,
-                           callback=callback)
+                                 callback=callback)
 
     async def set_pin_mode_digital_input_pull_down(self, pin_number, callback=None):
         &#34;&#34;&#34;
@@ -2204,7 +2184,7 @@ receiving a KeyboardInterrupt exception</p>
 
         &#34;&#34;&#34;
         await self._set_pin_mode(pin_number, PrivateConstants.AT_INPUT_PULL_DOWN,
-                           callback=callback)
+                                 callback=callback)
 
     async def set_pin_mode_digital_output(self, pin_number):
         &#34;&#34;&#34;
@@ -2216,7 +2196,7 @@ receiving a KeyboardInterrupt exception</p>
         await self._set_pin_mode(pin_number, PrivateConstants.AT_OUTPUT)
 
     async def set_pin_mode_neopixel(self, pin_number=28, num_pixels=8,
-                              fill_r=0, fill_g=0, fill_b=0):
+                                    fill_r=0, fill_g=0, fill_b=0):
         &#34;&#34;&#34;
         Initialize the pico for NeoPixel control. Fill with rgb values specified.
 
@@ -2358,7 +2338,7 @@ receiving a KeyboardInterrupt exception</p>
                 f&#39;Maximum Number Of DHTs Exceeded - set_pin_mode_dht fails for pin {pin}&#39;)
 
     # noinspection PyRedundantParentheses
-    def set_pin_mode_servo(self, pin_number, min_pulse=1000, max_pulse=2000):
+    async def set_pin_mode_servo(self, pin_number, min_pulse=1000, max_pulse=2000):
         &#34;&#34;&#34;
 
         Attach a pin to a servo motor
@@ -2374,10 +2354,11 @@ receiving a KeyboardInterrupt exception</p>
 
         &#34;&#34;&#34;
 
-        self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse, max_pulse)
+        await self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse,
+                               max_pulse)
         self.pico_pins[pin_number] = PrivateConstants.AT_SERVO
 
-    def servo_write(self, pin_number, value):
+    async def servo_write(self, pin_number, value):
         &#34;&#34;&#34;
         Write the value to the specified servo
 
@@ -2400,9 +2381,9 @@ receiving a KeyboardInterrupt exception</p>
         duty_cycle = int(value / 180 * servo_range) + min_duty
 
         # use a raw pwm write from the calculated values
-        self.pwm_write(pin_number, duty_cycle, True)
+        await self.pwm_write(pin_number, duty_cycle, True)
 
-    def set_pin_mode_sonar(self, trigger_pin, echo_pin, callback=None):
+    async def set_pin_mode_sonar(self, trigger_pin, echo_pin, callback=None):
         &#34;&#34;&#34;
         :param trigger_pin:  Sensor trigger gpio pin
 
@@ -2420,7 +2401,7 @@ receiving a KeyboardInterrupt exception</p>
 
         if not callback:
             if self.shutdown_on_exception:
-                self.shutdown()
+                await self.shutdown()
             raise RuntimeError(&#39;set_pin_mode_sonar: A Callback must be specified&#39;)
 
         if self.sonar_count &lt; PrivateConstants.MAX_SONARS:
@@ -2430,48 +2411,14 @@ receiving a KeyboardInterrupt exception</p>
                 PrivateConstants.AT_SONAR
 
             command = [PrivateConstants.SONAR_NEW, trigger_pin, echo_pin]
-            self._send_command(command)
+            await self._send_command(command)
         else:
             if self.shutdown_on_exception:
-                self.shutdown()
+                await self.shutdown()
             raise RuntimeError(&#39;Maximum number of supported sonar devices exceeded.&#39;)
 
-    async def get_pico_pins(self):
-        &#34;&#34;&#34;
-        This method returns the pico_pins dictionary
-
-        Pin Modes MAP:
-
-            DIGITAL_INPUT = 0
-
-            DIGITAL_OUTPUT = 1
-
-            PWM_OUTPUT = 2
-
-            DIGITAL_INPUT_PULLUP = 3
-
-            DIGITAL_INPUT_PULL_DOWN = 4
-
-            ANALOG_INPUT = 5
-
-            SERVO = 6
-
-            SONAR = 7
-
-            DHT = 8
-
-            I2C = 9
-
-            NEO_PIXEL = 10
-
-            AT_MODE_NOT_SET = 255
-
-        :return: pico_pins
-        &#34;&#34;&#34;
-        return self.pico_pins
-
     async def _set_pin_mode(self, pin_number, pin_state, differential=0, value_range=0,
-                      callback=None):
+                            callback=None):
 
         &#34;&#34;&#34;
         A private method to set the various pin modes.
@@ -2601,6 +2548,49 @@ receiving a KeyboardInterrupt exception</p>
         await self._send_command(command)
         await asyncio.sleep(.2)
 
+    async def _pico_report_dispatcher(self):
+        &#34;&#34;&#34;
+        This is a private method.
+        It continually accepts and interprets data coming from Telemetrix4RPiPico,and then
+        dispatches the correct handler to process the data.
+
+        It first receives the length of the packet, and then reads in the rest of the
+        packet. A packet consists of a length, report identifier and then the report data.
+        Using the report identifier, the report handler is fetched from report_dispatch.
+
+        :returns: This method never returns
+        &#34;&#34;&#34;
+
+        while True:
+            if self.shutdown_flag:
+                break
+            try:
+                packet_length = await self.serial_port.read()
+            except TypeError:
+                continue
+            except OSError:
+                break
+            # except AttributeError:
+            #     raise RuntimeError(&#39;Is your USB cable plugged in?&#39;)
+            #     if self.shutdown_on_exception:
+            #         await self.shutdown()
+
+            # get the rest of the packet
+            try:
+                packet = await self.serial_port.read(packet_length)
+            except TypeError:
+                continue
+            except OSError:
+                break
+
+            report = packet[0]
+            # handle all other messages by looking them up in the
+            # command dictionary
+
+            # noinspection PyArgumentList
+            await self.report_dispatch[report](packet[1:])
+            await asyncio.sleep(self.sleep_tune)
+
     async def _analog_message(self, data):
         &#34;&#34;&#34;
         This is a private message handler method.
@@ -2660,7 +2650,7 @@ receiving a KeyboardInterrupt exception</p>
             message = [PrivateConstants.DIGITAL_REPORT, pin, value, time_stamp]
             await self.digital_callbacks[pin](message)
 
-    def _i2c_read_report(self, data):
+    async def _i2c_read_report(self, data):
         &#34;&#34;&#34;
         Execute callback for i2c reads.
 
@@ -2673,35 +2663,40 @@ receiving a KeyboardInterrupt exception</p>
         cb_list.append(time.time())
 
         if cb_list[1]:
-            self.i2c_callback2(cb_list)
+            await self.i2c_callback2(cb_list)
         else:
-            self.i2c_callback(cb_list)
+            await self.i2c_callback(cb_list)
 
-    def _i2c_write_failed(self, data):
+    async def _i2c_write_failed(self, data):
         &#34;&#34;&#34;
         I2c write attempt failed
 
         :param data: data[0] = i2c_device
         &#34;&#34;&#34;
         if self.shutdown_on_exception:
-            self.shutdown()
+            await self.shutdown()
         raise RuntimeError(
             f&#39;i2c Write Failed for I2C port {data[0]}&#39;)
-        while True:
-            time.sleep(1)
 
-    def _i2c_read_failed(self, data):
+    async def _i2c_read_failed(self, data):
         &#34;&#34;&#34;
         I2c read failed
 
         :param data: data[0] = i2c device
         &#34;&#34;&#34;
         if self.shutdown_on_exception:
-            self.shutdown()
+            await self.shutdown()
         raise RuntimeError(
             f&#39;i2c Read Failed for I2C port {data[0]}&#39;)
-        while True:
-            time.sleep(.1)
+
+    async def _report_loop_data(self, data):
+        &#34;&#34;&#34;
+        Print data that was looped back
+        :param data: byte of loop back data
+        :return:
+        &#34;&#34;&#34;
+        if self.loop_back_callback:
+            await self.loop_back_callback(data)
 
     async def _report_unique_id(self, data):
         &#34;&#34;&#34;
@@ -2743,19 +2738,24 @@ receiving a KeyboardInterrupt exception</p>
         command.insert(0, len(command))
         # print(command)
         send_message = bytes(command)
-        await self.serial_port.write(send_message)
+        try:
+            await self.serial_port.write(send_message)
+        except AttributeError:
+            if self.shutdown_on_exception:
+                await self.shutdown()
+            raise RuntimeError(&#39;Is your USB cable plugged in?&#39;)
 
-    def _servo_unavailable(self, report):
+    async def _servo_unavailable(self, report):
         &#34;&#34;&#34;
         Message if no servos are available for use.
         :param report: pin number
         &#34;&#34;&#34;
         if self.shutdown_on_exception:
-            self.shutdown()
+            await self.shutdown()
         raise RuntimeError(
             f&#39;Servo Attach For Pin {report[0]} Failed: No Available Servos&#39;)
 
-    def _sonar_distance_report(self, report):
+    async def _sonar_distance_report(self, report):
         &#34;&#34;&#34;
 
         :param report: data[0] = trigger pin, data[1] and data[2] = distance
@@ -2775,7 +2775,7 @@ receiving a KeyboardInterrupt exception</p>
             cb_list = [PrivateConstants.SONAR_DISTANCE, report[0],
                        (report[1] + (report[2] / 100)), time.time()]
 
-        cb(cb_list)</code></pre>
+        await cb(cb_list)</code></pre>
 </details>
 <h3>Methods</h3>
 <dl>
@@ -3009,7 +3009,7 @@ time-stamp]</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def i2c_read(self, address, register, number_of_bytes,
-             callback=None, i2c_port=0, no_stop=False):
+                   callback=None, i2c_port=0, no_stop=False):
     &#34;&#34;&#34;
     Read the specified number of bytes from the specified register for
     the i2c device.
@@ -3326,8 +3326,6 @@ as a percentage between 0 and 100</p>
     if raw:
         if not (0 &lt;= duty_cycle &lt; PrivateConstants.MAX_RAW_DUTY_CYCLE):
             raise RuntimeError(&#39;Raw PWM duty cycle out of range&#39;)
-        # else:
-        #     dc = duty_cycle
     else:
         if not (0 &lt;= duty_cycle &lt;= 99):
             raise RuntimeError(&#39;Raw PWM duty cycle percentage of range&#39;)
@@ -3359,7 +3357,7 @@ as a percentage between 0 and 100</p>
 </details>
 </dd>
 <dt id="tmx_pico_aio.tmx_pico_aio.TmxPicoAio.servo_write"><code class="name flex">
-<span>def <span class="ident">servo_write</span></span>(<span>self, pin_number, value)</span>
+<span>async def <span class="ident">servo_write</span></span>(<span>self, pin_number, value)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Write the value to the specified servo</p>
@@ -3369,7 +3367,7 @@ as a percentage between 0 and 100</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def servo_write(self, pin_number, value):
+<pre><code class="python">async def servo_write(self, pin_number, value):
     &#34;&#34;&#34;
     Write the value to the specified servo
 
@@ -3392,7 +3390,7 @@ as a percentage between 0 and 100</p>
     duty_cycle = int(value / 180 * servo_range) + min_duty
 
     # use a raw pwm write from the calculated values
-    self.pwm_write(pin_number, duty_cycle, True)</code></pre>
+    await self.pwm_write(pin_number, duty_cycle, True)</code></pre>
 </details>
 </dd>
 <dt id="tmx_pico_aio.tmx_pico_aio.TmxPicoAio.set_pin_mode_analog_input"><code class="name flex">
@@ -3435,7 +3433,7 @@ report will be generated</p>
     if not 0 &lt; adc_number &lt; 5:
         raise RuntimeError(&#39;Invalid ADC Number&#39;)
     await self._set_pin_mode(adc_number, PrivateConstants.AT_ANALOG, differential,
-                       callback=callback)</code></pre>
+                             callback=callback)</code></pre>
 </details>
 </dd>
 <dt id="tmx_pico_aio.tmx_pico_aio.TmxPicoAio.set_pin_mode_dht"><code class="name flex">
@@ -3550,7 +3548,7 @@ Temperature (c),Time]</p>
 
     &#34;&#34;&#34;
     await self._set_pin_mode(pin_number, PrivateConstants.AT_INPUT_PULL_DOWN,
-                       callback=callback)</code></pre>
+                             callback=callback)</code></pre>
 </details>
 </dd>
 <dt id="tmx_pico_aio.tmx_pico_aio.TmxPicoAio.set_pin_mode_digital_input_pullup"><code class="name flex">
@@ -3584,7 +3582,7 @@ Temperature (c),Time]</p>
 
     &#34;&#34;&#34;
     await self._set_pin_mode(pin_number, PrivateConstants.AT_INPUT_PULLUP,
-                       callback=callback)</code></pre>
+                             callback=callback)</code></pre>
 </details>
 </dd>
 <dt id="tmx_pico_aio.tmx_pico_aio.TmxPicoAio.set_pin_mode_digital_output"><code class="name flex">
@@ -3695,7 +3693,7 @@ API.</li>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def set_pin_mode_neopixel(self, pin_number=28, num_pixels=8,
-                          fill_r=0, fill_g=0, fill_b=0):
+                                fill_r=0, fill_g=0, fill_b=0):
     &#34;&#34;&#34;
     Initialize the pico for NeoPixel control. Fill with rgb values specified.
 
@@ -3768,7 +3766,7 @@ PWM. Servo pins share the 16 PWM pins.</p>
 </details>
 </dd>
 <dt id="tmx_pico_aio.tmx_pico_aio.TmxPicoAio.set_pin_mode_servo"><code class="name flex">
-<span>def <span class="ident">set_pin_mode_servo</span></span>(<span>self, pin_number, min_pulse=1000, max_pulse=2000)</span>
+<span>async def <span class="ident">set_pin_mode_servo</span></span>(<span>self, pin_number, min_pulse=1000, max_pulse=2000)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Attach a pin to a servo motor</p>
@@ -3781,7 +3779,7 @@ There are 16 PWM pins shared between the Servo and PWM Output modes.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def set_pin_mode_servo(self, pin_number, min_pulse=1000, max_pulse=2000):
+<pre><code class="python">async def set_pin_mode_servo(self, pin_number, min_pulse=1000, max_pulse=2000):
     &#34;&#34;&#34;
 
     Attach a pin to a servo motor
@@ -3797,12 +3795,13 @@ There are 16 PWM pins shared between the Servo and PWM Output modes.</p>
 
     &#34;&#34;&#34;
 
-    self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse, max_pulse)
+    await self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse,
+                           max_pulse)
     self.pico_pins[pin_number] = PrivateConstants.AT_SERVO</code></pre>
 </details>
 </dd>
 <dt id="tmx_pico_aio.tmx_pico_aio.TmxPicoAio.set_pin_mode_sonar"><code class="name flex">
-<span>def <span class="ident">set_pin_mode_sonar</span></span>(<span>self, trigger_pin, echo_pin, callback=None)</span>
+<span>async def <span class="ident">set_pin_mode_sonar</span></span>(<span>self, trigger_pin, echo_pin, callback=None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>:param trigger_pin:
@@ -3817,7 +3816,7 @@ Sensor trigger gpio pin</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def set_pin_mode_sonar(self, trigger_pin, echo_pin, callback=None):
+<pre><code class="python">async def set_pin_mode_sonar(self, trigger_pin, echo_pin, callback=None):
     &#34;&#34;&#34;
     :param trigger_pin:  Sensor trigger gpio pin
 
@@ -3835,7 +3834,7 @@ Sensor trigger gpio pin</p>
 
     if not callback:
         if self.shutdown_on_exception:
-            self.shutdown()
+            await self.shutdown()
         raise RuntimeError(&#39;set_pin_mode_sonar: A Callback must be specified&#39;)
 
     if self.sonar_count &lt; PrivateConstants.MAX_SONARS:
@@ -3845,10 +3844,10 @@ Sensor trigger gpio pin</p>
             PrivateConstants.AT_SONAR
 
         command = [PrivateConstants.SONAR_NEW, trigger_pin, echo_pin]
-        self._send_command(command)
+        await self._send_command(command)
     else:
         if self.shutdown_on_exception:
-            self.shutdown()
+            await self.shutdown()
         raise RuntimeError(&#39;Maximum number of supported sonar devices exceeded.&#39;)</code></pre>
 </details>
 </dd>
