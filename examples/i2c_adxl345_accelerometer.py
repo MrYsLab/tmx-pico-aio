@@ -34,7 +34,7 @@ async def the_callback(data):
     time_stamp]
     """
 
-    time_stamp = data.pop()
+    time_stamp = data[11]
     date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time_stamp))
     print(f'Raw Data:  {data}')
     print(f'ADXL345 Report On: {date}: ')

@@ -47,10 +47,10 @@ async def the_callback(data):
 
 
 async def get_distance(the_board):
-    await the_board.set_pin_mode_sonar(2, 3, the_callback)
-    await the_board.set_pin_mode_sonar(4, 5, the_callback)
+    # await the_board.set_pin_mode_sonar(2, 3, the_callback)
+    # await the_board.set_pin_mode_sonar(4, 5, the_callback)
     await the_board.set_pin_mode_sonar(TRIGGER_PIN, ECHO_PIN, the_callback)
-    await the_board.set_pin_mode_sonar(6, 7, the_callback)
+    # await the_board.set_pin_mode_sonar(6, 7, the_callback)
 
     while True:
         # do nothing but sleep while the reports come in.
