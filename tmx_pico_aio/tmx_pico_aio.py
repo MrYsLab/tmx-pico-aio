@@ -65,11 +65,6 @@ class TmxPicoAio:
                                        when a shutdown is called or a serial
                                        error occurs
 
-
-        :param shutdown_on_exception: call shutdown before raising
-                                      a RunTimeError exception, or
-                                      receiving a KeyboardInterrupt exception
-
         :para reset_on_shutdown: Reset the board upon shutdown
         """
 
