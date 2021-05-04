@@ -44,7 +44,7 @@ async def the_callback(data):
     This will print the pin number, its reported value and
     the date and time when the change occurred
 
-    :param data: [pin mode, pin, current reported value, pin_mode, timestamp]
+    :param data: [pin mode, pin, current reported value, timestamp]
     """
     date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(data[CB_TIME]))
     print(f'Report Type: {data[CB_PIN_MODE]} Pin: {data[CB_PIN]} '
