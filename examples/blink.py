@@ -19,8 +19,6 @@
 """
 import asyncio
 import sys
-import time
-import termios
 
 from tmx_pico_aio import tmx_pico_aio
 

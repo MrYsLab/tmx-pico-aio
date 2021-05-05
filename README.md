@@ -1,12 +1,13 @@
-# Telemetrix-RPi-Pico
+# Tmx-Pico-Aio
 
-Interact and monitor  a Raspberry  Pi Pico remotely  from your PC using Python.
+Interact and monitor  a Raspberry  Pi Pico remotely  from your PC
+using Python asyncio.
 
 ![](images/tmx.png)
 
 A full User's Guide is [available online.](https://mryslab.github.io/telemetrix-rpi-pico/)
 
-Python API documentation  may be found [here.](https://htmlpreview.github.io/?https://github.com/MrYsLab/telemetrix-rpi-pico/blob/master/html/telemetrix_rpi_pico/index.html) 
+Python API documentation  may be found [here.](https://htmlpreview.github.io/?https://github.com/MrYsLab/tmx-pico-aio/blob/master/html/tmx_pico_aio/index.html) 
 
 The Pico server code may be viewed [here.](https://github.com/MrYsLab/Telemetrix4RpiPico)
 
@@ -32,7 +33,7 @@ The following functionality is implemented in this release:
 **Linux/macOS:**
 
 ```bash
-sudo pip3 install telemetrix-rpi-pico
+sudo pip3 install tmx-pico-aio
 ```
 
 
@@ -40,7 +41,7 @@ sudo pip3 install telemetrix-rpi-pico
 
 
 ```bash
-pip install telemetrix-rpi-pico 
+pip install tmx-pico-aio
 ```
 
 ### If you are upgrading from a previously installed version:
@@ -48,7 +49,7 @@ pip install telemetrix-rpi-pico
 **Linux/macOS:**
 
 ```bash
-sudo pip3 install telemetrix-rpi-pico --upgrade
+sudo pip3 install tmx-pico-aio --upgrade
 ```
 
 
@@ -56,7 +57,7 @@ sudo pip3 install telemetrix-rpi-pico --upgrade
 
 
 ```bash
-pip install telemetrix-rpi-pico --upgrade
+pip install tmx-pico-aio --upgrade
 ```
 
 ## To Install The Pico Server Application
@@ -74,7 +75,7 @@ pip install telemetrix-rpi-pico --upgrade
 
 ## Download And Run The Examples
    
-1. [Download,](https://github.com/MrYsLab/telemetrix-rpi-pico/archive/master.zip) 
+1. [Download,](https://github.com/MrYsLab/tmx-pico-aio/archive/master.zip) 
    save, and uncompress the teletmetrix-rpi-pico Github repository.
    
 2. Open the _examples_ directory and run any of the examples. You may
