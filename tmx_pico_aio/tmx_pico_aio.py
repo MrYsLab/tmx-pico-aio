@@ -1123,6 +1123,9 @@ class TmxPicoAio:
     '''
 
     async def reset_board(self):
+        """
+        Send a command to the Pico to perform a hardware reset
+        """
         command = [PrivateConstants.RESET_BOARD]
         await self._send_command(command)
         await asyncio.sleep(.2)

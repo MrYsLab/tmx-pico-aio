@@ -106,11 +106,6 @@ class TmxPicoAio:
                                        when a shutdown is called or a serial
                                        error occurs
 
-
-        :param shutdown_on_exception: call shutdown before raising
-                                      a RunTimeError exception, or
-                                      receiving a KeyboardInterrupt exception
-
         :para reset_on_shutdown: Reset the board upon shutdown
         &#34;&#34;&#34;
 
@@ -1169,6 +1164,9 @@ class TmxPicoAio:
     &#39;&#39;&#39;
 
     async def reset_board(self):
+        &#34;&#34;&#34;
+        Send a command to the Pico to perform a hardware reset
+        &#34;&#34;&#34;
         command = [PrivateConstants.RESET_BOARD]
         await self._send_command(command)
         await asyncio.sleep(.2)
@@ -1435,9 +1433,6 @@ receiving a KeyboardInterrupt exception</p>
 <p>:param close_loop_on_shutdown: stop and close the event loop loop
 when a shutdown is called or a serial
 error occurs</p>
-<p>:param shutdown_on_exception: call shutdown before raising
-a RunTimeError exception, or
-receiving a KeyboardInterrupt exception</p>
 <p>:para reset_on_shutdown: Reset the board upon shutdown</p></div>
 <details class="source">
 <summary>
@@ -1480,11 +1475,6 @@ receiving a KeyboardInterrupt exception</p>
         :param close_loop_on_shutdown: stop and close the event loop loop
                                        when a shutdown is called or a serial
                                        error occurs
-
-
-        :param shutdown_on_exception: call shutdown before raising
-                                      a RunTimeError exception, or
-                                      receiving a KeyboardInterrupt exception
 
         :para reset_on_shutdown: Reset the board upon shutdown
         &#34;&#34;&#34;
@@ -2544,6 +2534,9 @@ receiving a KeyboardInterrupt exception</p>
     &#39;&#39;&#39;
 
     async def reset_board(self):
+        &#34;&#34;&#34;
+        Send a command to the Pico to perform a hardware reset
+        &#34;&#34;&#34;
         command = [PrivateConstants.RESET_BOARD]
         await self._send_command(command)
         await asyncio.sleep(.2)
@@ -3345,12 +3338,15 @@ as a percentage between 0 and 100</p>
 <span>async def <span class="ident">reset_board</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Send a command to the Pico to perform a hardware reset</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def reset_board(self):
+    &#34;&#34;&#34;
+    Send a command to the Pico to perform a hardware reset
+    &#34;&#34;&#34;
     command = [PrivateConstants.RESET_BOARD]
     await self._send_command(command)
     await asyncio.sleep(.2)</code></pre>
