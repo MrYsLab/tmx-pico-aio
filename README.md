@@ -7,7 +7,7 @@ using Python asyncio.
 
 A full User's Guide is [available online.](https://mryslab.github.io/telemetrix-rpi-pico/)
 
-Python API documentation  may be found [here.](https://htmlpreview.github.io/?https://github.com/MrYsLab/tmx-pico-aio/blob/master/html/tmx_pico_aio/index.html) 
+Python API documentation  may be found [here.](https://htmlpreview.github.io/?https://github.com/MrYsLab/tmx-pico-aio/blob/spi/html/tmx_pico_aio/index.html) 
 
 The Pico server code may be viewed [here.](https://github.com/MrYsLab/Telemetrix4RpiPico)
 
