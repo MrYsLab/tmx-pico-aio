@@ -68,6 +68,9 @@ except KeyboardInterrupt:
 try:
     # start the main function
     loop.run_until_complete(get_distance(board))
-except KeyboardInterrupt:
     loop.run_until_complete(board.reset_board())
+except KeyboardInterrupt:
+    loop.run_until_complete(board.shutdown())
+    sys.exit(0)
+except RuntimeError:
     sys.exit(0)

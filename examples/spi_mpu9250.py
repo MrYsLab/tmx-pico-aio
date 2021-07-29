@@ -141,17 +141,17 @@ async def read_mpu9250():
 loop = asyncio.get_event_loop()
 try:
     pico = tmx_pico_aio.TmxPicoAio()
-except KeyboardInterrupt:
+except (KeyboardInterrupt, RuntimeError):
     sys.exit()
 
 try:
     # start the main function
     loop.run_until_complete(read_mpu9250())
-    loop.run_until_complete(pico.reset_board())
 except KeyboardInterrupt:
-    loop.run_until_complete(pico.shutdown())
-    sys.exit(0)
-
-
+    try:
+        loop.run_until_complete(pico.shutdown())
+        sys.exit(0)
+    except RuntimeError:
+        sys.exit(0)
 
 

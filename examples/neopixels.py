@@ -68,10 +68,11 @@ try:
     board = tmx_pico_aio.TmxPicoAio()
     # start the main function
     loop.run_until_complete(neopixel_demo(board))
+    loop.run_until_complete(board.reset_board())
 except KeyboardInterrupt:
-    try:
-        loop.run_until_complete(board.reset_board())
-    except RuntimeError:
-        sys.exit(0)
+    loop.run_until_complete(board.shutdown())
+    sys.exit(0)
+except RuntimeError:
+    sys.exit(0)
 
 

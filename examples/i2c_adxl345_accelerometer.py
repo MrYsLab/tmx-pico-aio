@@ -84,9 +84,9 @@ except KeyboardInterrupt:
 try:
     # start the main function
     loop.run_until_complete(adxl345(board))
+    loop.run_until_complete(board.reset_board())
 except KeyboardInterrupt:
-    try:
-        loop.run_until_complete(board.reset_board())
-    except RuntimeError:
-        sys.exit(0)
-    # sys.exit(0)
+    loop.run_until_complete(board.shutdown())
+    sys.exit(0)
+except RuntimeError:
+    sys.exit(0)
