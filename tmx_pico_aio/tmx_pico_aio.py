@@ -124,7 +124,6 @@ class TmxPicoAio:
         self.report_dispatch.update({PrivateConstants.DHT_REPORT: self._dht_report})
         self.report_dispatch.update({PrivateConstants.SPI_REPORT: self._spi_report})
 
-
         # up to 16 pwm pins may be simultaneously active
         self.pwm_active_count = 0
 
@@ -943,12 +942,12 @@ class TmxPicoAio:
         """
 
         await self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse,
-                               max_pulse)
+                                 max_pulse)
         self.pico_pins[pin_number] = PrivateConstants.AT_SERVO
 
     async def set_pin_mode_spi(self, spi_port=0, miso=16, mosi=19, clock_pin=18,
-                         clk_frequency=500000, chip_select_list=None,
-                         qualify_pins=True):
+                               clk_frequency=500000, chip_select_list=None,
+                               qualify_pins=True):
         """
         Specify the SPI port, SPI pins, clock frequency and an optional
         list of chip select pins. The SPI port is configured as a "master".
@@ -1122,7 +1121,7 @@ class TmxPicoAio:
         await self._send_command(command)
 
     async def spi_read_blocking(self, number_of_bytes, spi_port=0, call_back=None,
-                          repeated_tx_data=0):
+                                repeated_tx_data=0):
         """
         Read the specified number of bytes from the specified SPI port and
         call the callback function with the reported data.
@@ -1142,6 +1141,20 @@ class TmxPicoAio:
             if self.shutdown_on_exception:
                 await self.shutdown()
             raise RuntimeError('spi_read_blocking: A Callback must be specified')
+
+        if not spi_port:
+            if not self.spi_0_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    'spi_read_blocking: set_pin_mode_spi never called for spi port 0.')
+
+        elif spi_port:
+            if not self.spi_1_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    'spi_read_blocking: set_pin_mode_spi never called for spi port 1.')
         if spi_port == 0:
             self.spi_callback = call_back
         else:
@@ -1163,7 +1176,19 @@ class TmxPicoAio:
 
         :param spi_phase: clock phase. 0 or 1.
         """
+        if not spi_port:
+            if not self.spi_0_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    'spi_set_format: set_pin_mode_spi never called for spi port 0.')
 
+        elif spi_port:
+            if not self.spi_1_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    'spi_set_format: set_pin_mode_spi never called for spi port 1.')
         command = [PrivateConstants.SPI_SET_FORMAT, spi_port, data_bits,
                    spi_polarity, spi_phase]
         await self._send_command(command)
@@ -1178,6 +1203,19 @@ class TmxPicoAio:
         :param spi_port: SPI port 0 or 1
 
         """
+        if not spi_port:
+            if not self.spi_0_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    'spi_write_blocking: set_pin_mode_spi never called for spi port 0.')
+
+        elif spi_port:
+            if not self.spi_1_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    'spi_write_blocking: set_pin_mode_spi never called for spi port 1.')
         command = [PrivateConstants.SPI_WRITE_BLOCKING, spi_port,
                    len(bytes_to_write)]
 
@@ -1548,7 +1586,6 @@ class TmxPicoAio:
         """
         value = (data[1] << 8) + data[2]
         print(f'DEBUG ID: {data[0]} Value: {value}')
-
 
     async def _send_command(self, command):
         """
