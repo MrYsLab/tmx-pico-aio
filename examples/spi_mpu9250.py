@@ -121,7 +121,7 @@ FREQ = 500000
 
 async def read_mpu9250():
     # initialize the device
-    await pico.set_pin_mode_spi(SPI_PORT, MISO, MOSI, NUM_BYTES_TO_READ,
+    await pico.set_pin_mode_spi(SPI_PORT, MISO, MOSI, CLK,
                           FREQ, CS, qualify_pins=False)
     # reset the device
     await pico.spi_cs_control(CS_PIN, 0)
