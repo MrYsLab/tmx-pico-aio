@@ -1137,6 +1137,7 @@ class TmxPicoAio:
 
         callback returns a data list:
         [SPI_READ_REPORT, spi_port, count of data bytes, data bytes, time-stamp]
+
         SPI_READ_REPORT = 13
 
 
