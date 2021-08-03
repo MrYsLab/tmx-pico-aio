@@ -167,7 +167,6 @@ class TmxPicoAio:
         self.report_dispatch.update({PrivateConstants.DHT_REPORT: self._dht_report})
         self.report_dispatch.update({PrivateConstants.SPI_REPORT: self._spi_report})
 
-
         # up to 16 pwm pins may be simultaneously active
         self.pwm_active_count = 0
 
@@ -986,12 +985,12 @@ class TmxPicoAio:
         &#34;&#34;&#34;
 
         await self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse,
-                               max_pulse)
+                                 max_pulse)
         self.pico_pins[pin_number] = PrivateConstants.AT_SERVO
 
     async def set_pin_mode_spi(self, spi_port=0, miso=16, mosi=19, clock_pin=18,
-                         clk_frequency=500000, chip_select_list=None,
-                         qualify_pins=True):
+                               clk_frequency=500000, chip_select_list=None,
+                               qualify_pins=True):
         &#34;&#34;&#34;
         Specify the SPI port, SPI pins, clock frequency and an optional
         list of chip select pins. The SPI port is configured as a &#34;master&#34;.
@@ -1165,7 +1164,7 @@ class TmxPicoAio:
         await self._send_command(command)
 
     async def spi_read_blocking(self, number_of_bytes, spi_port=0, call_back=None,
-                          repeated_tx_data=0):
+                                repeated_tx_data=0):
         &#34;&#34;&#34;
         Read the specified number of bytes from the specified SPI port and
         call the callback function with the reported data.
@@ -1179,12 +1178,31 @@ class TmxPicoAio:
 
         :param repeated_tx_data: repeated data to send
 
+        callback returns a data list:
+        [SPI_READ_REPORT, spi_port, count of data bytes, data bytes, time-stamp]
+        SPI_READ_REPORT = 13
+
+
         &#34;&#34;&#34;
 
         if not call_back:
             if self.shutdown_on_exception:
                 await self.shutdown()
             raise RuntimeError(&#39;spi_read_blocking: A Callback must be specified&#39;)
+
+        if not spi_port:
+            if not self.spi_0_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_read_blocking: set_pin_mode_spi never called for spi port 0.&#39;)
+
+        elif spi_port:
+            if not self.spi_1_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_read_blocking: set_pin_mode_spi never called for spi port 1.&#39;)
         if spi_port == 0:
             self.spi_callback = call_back
         else:
@@ -1206,7 +1224,19 @@ class TmxPicoAio:
 
         :param spi_phase: clock phase. 0 or 1.
         &#34;&#34;&#34;
+        if not spi_port:
+            if not self.spi_0_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_set_format: set_pin_mode_spi never called for spi port 0.&#39;)
 
+        elif spi_port:
+            if not self.spi_1_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_set_format: set_pin_mode_spi never called for spi port 1.&#39;)
         command = [PrivateConstants.SPI_SET_FORMAT, spi_port, data_bits,
                    spi_polarity, spi_phase]
         await self._send_command(command)
@@ -1221,6 +1251,19 @@ class TmxPicoAio:
         :param spi_port: SPI port 0 or 1
 
         &#34;&#34;&#34;
+        if not spi_port:
+            if not self.spi_0_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_write_blocking: set_pin_mode_spi never called for spi port 0.&#39;)
+
+        elif spi_port:
+            if not self.spi_1_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_write_blocking: set_pin_mode_spi never called for spi port 1.&#39;)
         command = [PrivateConstants.SPI_WRITE_BLOCKING, spi_port,
                    len(bytes_to_write)]
 
@@ -1591,7 +1634,6 @@ class TmxPicoAio:
         &#34;&#34;&#34;
         value = (data[1] &lt;&lt; 8) + data[2]
         print(f&#39;DEBUG ID: {data[0]} Value: {value}&#39;)
-
 
     async def _send_command(self, command):
         &#34;&#34;&#34;
@@ -1779,7 +1821,6 @@ error occurs</p>
         self.report_dispatch.update({PrivateConstants.DHT_REPORT: self._dht_report})
         self.report_dispatch.update({PrivateConstants.SPI_REPORT: self._spi_report})
 
-
         # up to 16 pwm pins may be simultaneously active
         self.pwm_active_count = 0
 
@@ -2598,12 +2639,12 @@ error occurs</p>
         &#34;&#34;&#34;
 
         await self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse,
-                               max_pulse)
+                                 max_pulse)
         self.pico_pins[pin_number] = PrivateConstants.AT_SERVO
 
     async def set_pin_mode_spi(self, spi_port=0, miso=16, mosi=19, clock_pin=18,
-                         clk_frequency=500000, chip_select_list=None,
-                         qualify_pins=True):
+                               clk_frequency=500000, chip_select_list=None,
+                               qualify_pins=True):
         &#34;&#34;&#34;
         Specify the SPI port, SPI pins, clock frequency and an optional
         list of chip select pins. The SPI port is configured as a &#34;master&#34;.
@@ -2777,7 +2818,7 @@ error occurs</p>
         await self._send_command(command)
 
     async def spi_read_blocking(self, number_of_bytes, spi_port=0, call_back=None,
-                          repeated_tx_data=0):
+                                repeated_tx_data=0):
         &#34;&#34;&#34;
         Read the specified number of bytes from the specified SPI port and
         call the callback function with the reported data.
@@ -2791,12 +2832,31 @@ error occurs</p>
 
         :param repeated_tx_data: repeated data to send
 
+        callback returns a data list:
+        [SPI_READ_REPORT, spi_port, count of data bytes, data bytes, time-stamp]
+        SPI_READ_REPORT = 13
+
+
         &#34;&#34;&#34;
 
         if not call_back:
             if self.shutdown_on_exception:
                 await self.shutdown()
             raise RuntimeError(&#39;spi_read_blocking: A Callback must be specified&#39;)
+
+        if not spi_port:
+            if not self.spi_0_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_read_blocking: set_pin_mode_spi never called for spi port 0.&#39;)
+
+        elif spi_port:
+            if not self.spi_1_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_read_blocking: set_pin_mode_spi never called for spi port 1.&#39;)
         if spi_port == 0:
             self.spi_callback = call_back
         else:
@@ -2818,7 +2878,19 @@ error occurs</p>
 
         :param spi_phase: clock phase. 0 or 1.
         &#34;&#34;&#34;
+        if not spi_port:
+            if not self.spi_0_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_set_format: set_pin_mode_spi never called for spi port 0.&#39;)
 
+        elif spi_port:
+            if not self.spi_1_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_set_format: set_pin_mode_spi never called for spi port 1.&#39;)
         command = [PrivateConstants.SPI_SET_FORMAT, spi_port, data_bits,
                    spi_polarity, spi_phase]
         await self._send_command(command)
@@ -2833,6 +2905,19 @@ error occurs</p>
         :param spi_port: SPI port 0 or 1
 
         &#34;&#34;&#34;
+        if not spi_port:
+            if not self.spi_0_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_write_blocking: set_pin_mode_spi never called for spi port 0.&#39;)
+
+        elif spi_port:
+            if not self.spi_1_active:
+                if self.shutdown_on_exception:
+                    await self.shutdown()
+                raise RuntimeError(
+                    &#39;spi_write_blocking: set_pin_mode_spi never called for spi port 1.&#39;)
         command = [PrivateConstants.SPI_WRITE_BLOCKING, spi_port,
                    len(bytes_to_write)]
 
@@ -3203,7 +3288,6 @@ error occurs</p>
         &#34;&#34;&#34;
         value = (data[1] &lt;&lt; 8) + data[2]
         print(f&#39;DEBUG ID: {data[0]} Value: {value}&#39;)
-
 
     async def _send_command(self, command):
         &#34;&#34;&#34;
@@ -4278,7 +4362,7 @@ There are 16 PWM pins shared between the Servo and PWM Output modes.</p>
     &#34;&#34;&#34;
 
     await self._set_pin_mode(pin_number, PrivateConstants.AT_SERVO, min_pulse,
-                           max_pulse)
+                             max_pulse)
     self.pico_pins[pin_number] = PrivateConstants.AT_SERVO</code></pre>
 </details>
 </dd>
@@ -4371,8 +4455,8 @@ freq 3, freq 2, freq 1, number of cs pins, cs pins&hellip;]</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def set_pin_mode_spi(self, spi_port=0, miso=16, mosi=19, clock_pin=18,
-                     clk_frequency=500000, chip_select_list=None,
-                     qualify_pins=True):
+                           clk_frequency=500000, chip_select_list=None,
+                           qualify_pins=True):
     &#34;&#34;&#34;
     Specify the SPI port, SPI pins, clock frequency and an optional
     list of chip select pins. The SPI port is configured as a &#34;master&#34;.
@@ -4580,13 +4664,16 @@ call the callback function with the reported data.</p>
 <p>:param spi_port: SPI port 0 or 1</p>
 <p>:param call_back: Required callback function to report spi data as a
 result of read command</p>
-<p>:param repeated_tx_data: repeated data to send</p></div>
+<p>:param repeated_tx_data: repeated data to send</p>
+<p>callback returns a data list:
+[SPI_READ_REPORT, spi_port, count of data bytes, data bytes, time-stamp]
+SPI_READ_REPORT = 13</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def spi_read_blocking(self, number_of_bytes, spi_port=0, call_back=None,
-                      repeated_tx_data=0):
+                            repeated_tx_data=0):
     &#34;&#34;&#34;
     Read the specified number of bytes from the specified SPI port and
     call the callback function with the reported data.
@@ -4600,12 +4687,31 @@ result of read command</p>
 
     :param repeated_tx_data: repeated data to send
 
+    callback returns a data list:
+    [SPI_READ_REPORT, spi_port, count of data bytes, data bytes, time-stamp]
+    SPI_READ_REPORT = 13
+
+
     &#34;&#34;&#34;
 
     if not call_back:
         if self.shutdown_on_exception:
             await self.shutdown()
         raise RuntimeError(&#39;spi_read_blocking: A Callback must be specified&#39;)
+
+    if not spi_port:
+        if not self.spi_0_active:
+            if self.shutdown_on_exception:
+                await self.shutdown()
+            raise RuntimeError(
+                &#39;spi_read_blocking: set_pin_mode_spi never called for spi port 0.&#39;)
+
+    elif spi_port:
+        if not self.spi_1_active:
+            if self.shutdown_on_exception:
+                await self.shutdown()
+            raise RuntimeError(
+                &#39;spi_read_blocking: set_pin_mode_spi never called for spi port 1.&#39;)
     if spi_port == 0:
         self.spi_callback = call_back
     else:
@@ -4641,7 +4747,19 @@ result of read command</p>
 
     :param spi_phase: clock phase. 0 or 1.
     &#34;&#34;&#34;
+    if not spi_port:
+        if not self.spi_0_active:
+            if self.shutdown_on_exception:
+                await self.shutdown()
+            raise RuntimeError(
+                &#39;spi_set_format: set_pin_mode_spi never called for spi port 0.&#39;)
 
+    elif spi_port:
+        if not self.spi_1_active:
+            if self.shutdown_on_exception:
+                await self.shutdown()
+            raise RuntimeError(
+                &#39;spi_set_format: set_pin_mode_spi never called for spi port 1.&#39;)
     command = [PrivateConstants.SPI_SET_FORMAT, spi_port, data_bits,
                spi_polarity, spi_phase]
     await self._send_command(command)</code></pre>
@@ -4669,6 +4787,19 @@ list.</p>
     :param spi_port: SPI port 0 or 1
 
     &#34;&#34;&#34;
+    if not spi_port:
+        if not self.spi_0_active:
+            if self.shutdown_on_exception:
+                await self.shutdown()
+            raise RuntimeError(
+                &#39;spi_write_blocking: set_pin_mode_spi never called for spi port 0.&#39;)
+
+    elif spi_port:
+        if not self.spi_1_active:
+            if self.shutdown_on_exception:
+                await self.shutdown()
+            raise RuntimeError(
+                &#39;spi_write_blocking: set_pin_mode_spi never called for spi port 1.&#39;)
     command = [PrivateConstants.SPI_WRITE_BLOCKING, spi_port,
                len(bytes_to_write)]
 
