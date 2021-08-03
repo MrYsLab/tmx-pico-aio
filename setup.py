@@ -11,7 +11,7 @@ setup(
     packages=['tmx_pico_aio'],
     install_requires=['pyserial'],
 
-    version='1.0',
+    version='1.1',
     description="Remotely Control And Monitor A Raspberry Pi Pico Using Asyncio",
     long_description=long_description,
     long_description_content_type='text/markdown',
