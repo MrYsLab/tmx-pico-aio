@@ -68,10 +68,9 @@ class PrivateConstants:
     DHT_REPORT = 12
     SPI_REPORT = 13
 
-
     DEBUG_PRINT = 99
 
-    TELEMETRIX_VERSION = "1.1"
+    TELEMETRIX_VERSION = "1.3"
 
     # reporting control
     REPORTING_DISABLE_ALL = 0
