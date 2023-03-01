@@ -52,6 +52,7 @@ class PrivateConstants:
     SPI_READ_BLOCKING = 26
     SPI_SET_FORMAT = 27
     SPI_CS_CONTROL = 28
+    SET_SCAN_DELAY = 29
 
 
     # reports
@@ -70,7 +71,7 @@ class PrivateConstants:
 
     DEBUG_PRINT = 99
 
-    TELEMETRIX_VERSION = "1.3"
+    TELEMETRIX_VERSION = "1.4"
 
     # reporting control
     REPORTING_DISABLE_ALL = 0

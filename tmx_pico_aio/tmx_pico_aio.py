@@ -1274,6 +1274,17 @@ class TmxPicoAio:
                 await self.shutdown()
             raise RuntimeError('Maximum number of supported sonar devices exceeded.')
 
+    async def set_scan_delay(self, delay=0):
+        """
+        Set an input scan delay on the pico.
+        This helps to compensate for a client with limited UART capacity
+
+        :param delay: delay in ms.
+        """
+
+        command = [PrivateConstants.SET_SCAN_DELAY, delay]
+        await self._send_command(command)
+
     async def _set_pin_mode(self, pin_number, pin_state, differential=0, value_range=0,
                             callback=None):
 
