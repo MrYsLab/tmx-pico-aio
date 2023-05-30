@@ -123,7 +123,7 @@ class TmxPicoAio:
             {PrivateConstants.SONAR_DISTANCE: self._sonar_distance_report})
         self.report_dispatch.update({PrivateConstants.DHT_REPORT: self._dht_report})
         self.report_dispatch.update({PrivateConstants.SPI_REPORT: self._spi_report})
-
+        self.report_dispatch.update({PrivateConstants.ENCODER_REPORT: self._encoder_report})
         # up to 16 pwm pins may be simultaneously active
         self.pwm_active_count = 0
 
@@ -154,6 +154,9 @@ class TmxPicoAio:
         self.dht_callbacks = {}
 
         self.dht_count = 0
+
+        self.encoder_callbacks = {}
+        self.encoder_count = 0
 
         # serial port in use
         self.serial_port = None
@@ -288,7 +291,7 @@ class TmxPicoAio:
         for port in the_ports_list:
             if port.pid is None:
                 continue
-            if port.pid != 10 or port.vid != 11914:
+            if not ((port.pid == 10 and port.vid == 11914) or (port.pid == 29987 and port.vid == 6790)):
                 continue
             try:
                 self.serial_port = TelemetrixAioSerial(port.device, 115200,
@@ -1114,6 +1117,50 @@ class TmxPicoAio:
         # use a raw pwm write from the calculated values
         await self.pwm_write(pin_number, duty_cycle, True)
 
+    def set_pin_mode_encoder(self, pin_A, pin_B=0, callback=None,quadrature = True):
+        """
+        :param pin_A:  Sensor trigger gpio pin
+
+        :param pin_B: Sensor echo gpio pin
+
+        :param callback: callback, only called on encoder step
+
+        :param quadrature: quadrature encoder or single encoder(False)
+
+       callback returns a data list:
+
+       [ ENCODER_REPORT, pin_A, steps, time_stamp]
+
+       ENCODER_REPORT =  14
+
+        """
+
+        if not callback:
+            if self.shutdown_on_exception:
+                self.shutdown()
+            raise RuntimeError('set_pin_mode_encoder: A callback must be specified')
+        if quadrature and pin_B==-1:
+            raise RuntimeError('set_pin_mode_encoder: quadrature encoder requires pin_B')
+        if self.encoder_count < PrivateConstants.MAX_ENCODERS:
+            self.encoder_callbacks[pin_A] = callback
+            self.encoder_count+= 1
+            self.pico_pins[pin_A] = PrivateConstants.AT_ENCODER
+
+            encoder_type = 1 #single
+            if(quadrature):
+                self.pico_pins[pin_B] = PrivateConstants.AT_ENCODER
+                encoder_type = 2
+            else:
+                pin_B = 0
+            
+            
+            command = [PrivateConstants.ENCODER_NEW, encoder_type, pin_A, pin_B]
+            self._send_command(command)
+        else:
+            if self.shutdown_on_exception:
+                self.shutdown()
+            raise RuntimeError('Maximum number of supported sonar devices exceeded.')
+
     async def spi_cs_control(self, chip_select_pin, select):
         """
         Control an SPI chip select line
@@ -1396,6 +1443,26 @@ class TmxPicoAio:
         except (RuntimeError, SerialException):
             pass
 
+    def _encoder_report(self, report):
+        """
+
+        :param report: data[0] = pin A, data[1] = steps (signed)
+
+        callback report format: [PrivateConstants.ENCODER_REPORT, pin_A, steps, time_stamp]
+        """
+
+        # get callback from pin number
+        cb = self.encoder_callbacks[report[0]]
+
+        steps = report[1]
+        if(steps > 128): # convert from uint8 to int8 value
+            steps -= 256
+        
+        cb_list = [PrivateConstants.ENCODER_REPORT, report[0],
+                    steps, time.time()]
+
+        cb(cb_list)
+
     async def _spi_report(self, report):
         """
         Execute callback for spi reads.
@@ -1467,6 +1534,14 @@ class TmxPicoAio:
             # noinspection PyArgumentList
             await self.report_dispatch[report](packet[1:])
             await asyncio.sleep(self.sleep_tune)
+
+    def set_scan_delay(self, delay):
+        """
+        Set the scan delay to a delay in ms
+        """
+        command = [PrivateConstants.SET_SCAN_DELAY, delay]
+        self._send_command(command)
+
 
     async def _analog_message(self, data):
         """
