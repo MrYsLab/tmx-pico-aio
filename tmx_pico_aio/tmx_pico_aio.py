@@ -1134,7 +1134,6 @@ class TmxPicoAio:
        ENCODER_REPORT =  14
 
         """
-
         if not callback:
             if self.shutdown_on_exception:
                 self.shutdown()
@@ -1302,7 +1301,6 @@ class TmxPicoAio:
        SONAR_DISTANCE =  11
 
         """
-
         if not callback:
             if self.shutdown_on_exception:
                 await self.shutdown()
@@ -1443,7 +1441,7 @@ class TmxPicoAio:
         except (RuntimeError, SerialException):
             pass
 
-    def _encoder_report(self, report):
+    async def _encoder_report(self, report):
         """
 
         :param report: data[0] = pin A, data[1] = steps (signed)
@@ -1461,7 +1459,7 @@ class TmxPicoAio:
         cb_list = [PrivateConstants.ENCODER_REPORT, report[0],
                     steps, time.time()]
 
-        cb(cb_list)
+        await cb(cb_list)
 
     async def _spi_report(self, report):
         """
