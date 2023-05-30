@@ -1720,11 +1720,11 @@ class TmxPicoAio:
         cb = self.sonar_callbacks[report[0]]
 
         # build report data
-        if report[1] == 0 and report[2] == 0:
+        if report[1] == 0 and report[2] == 0 and report[3] == 0:
             cb_list = [PrivateConstants.SONAR_DISTANCE, report[0],
                        0, time.time()]
         else:
             cb_list = [PrivateConstants.SONAR_DISTANCE, report[0],
-                       (report[1] + (report[2] / 100)), time.time()]
+                       (report[1]*100 + report[2] + (report[3] / 100)), time.time()]
 
         await cb(cb_list)
