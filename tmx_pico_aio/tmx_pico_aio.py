@@ -1117,7 +1117,7 @@ class TmxPicoAio:
         # use a raw pwm write from the calculated values
         await self.pwm_write(pin_number, duty_cycle, True)
 
-    def set_pin_mode_encoder(self, pin_A, pin_B=0, callback=None,quadrature = True):
+    async def set_pin_mode_encoder(self, pin_A, pin_B=0, callback=None,quadrature = True):
         """
         :param pin_A:  Sensor trigger gpio pin
 
@@ -1155,7 +1155,7 @@ class TmxPicoAio:
             
             
             command = [PrivateConstants.ENCODER_NEW, encoder_type, pin_A, pin_B]
-            self._send_command(command)
+            await self._send_command(command)
         else:
             if self.shutdown_on_exception:
                 self.shutdown()
@@ -1535,12 +1535,12 @@ class TmxPicoAio:
             await self.report_dispatch[report](packet[1:])
             await asyncio.sleep(self.sleep_tune)
 
-    def set_scan_delay(self, delay):
+    async def set_scan_delay(self, delay):
         """
         Set the scan delay to a delay in ms
         """
         command = [PrivateConstants.SET_SCAN_DELAY, delay]
-        self._send_command(command)
+        await self._send_command(command)
 
 
     async def _analog_message(self, data):
