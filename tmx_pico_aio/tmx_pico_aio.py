@@ -157,6 +157,7 @@ class TmxPicoAio:
 
         self.encoder_callbacks = {}
         self.encoder_count = 0
+        self.encoder_steps = {}
 
         # serial port in use
         self.serial_port = None
@@ -1143,6 +1144,7 @@ class TmxPicoAio:
             raise RuntimeError('set_pin_mode_encoder: quadrature encoder requires pin_B')
         if self.encoder_count < PrivateConstants.MAX_ENCODERS:
             self.encoder_callbacks[pin_A] = callback
+            self.encoder_steps[pin_A] = 0
             self.encoder_count+= 1
             self.pico_pins[pin_A] = PrivateConstants.AT_ENCODER
 
@@ -1457,9 +1459,10 @@ class TmxPicoAio:
         steps = report[1]
         if(steps > 128): # convert from uint8 to int8 value
             steps -= 256
+        self.encoder_steps[report[0]] +=steps
         
         cb_list = [PrivateConstants.ENCODER_REPORT, report[0],
-                    steps, time.time()]
+                    self.encoder_steps[report[0]], time.time()]
 
         cb(cb_list)
 
