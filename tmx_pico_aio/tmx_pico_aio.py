@@ -502,12 +502,11 @@ class TmxPicoAio:
             if not (0 <= duty_cycle < PrivateConstants.MAX_RAW_DUTY_CYCLE):
                 raise RuntimeError('Raw PWM duty cycle out of range')
         else:
-            if not (0 <= duty_cycle <= 99):
+            if not (0 <= duty_cycle <= 100):
                 raise RuntimeError('Raw PWM duty cycle percentage of range')
             # calculate percentage of duty cycle
             else:
-                duty_cycle = ((PrivateConstants.MAX_RAW_DUTY_CYCLE * duty_cycle) // 100)
-                # print(duty_cycle)
+                duty_cycle = (PrivateConstants.MAX_RAW_DUTY_CYCLE * duty_cycle) // 100
 
         value_msb = duty_cycle >> 8
         value_lsb = duty_cycle & 0x00ff
