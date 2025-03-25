@@ -26,6 +26,10 @@ classifiers=[
         'Topic :: Software Development :: Libraries :: Python Modules'
     ]
 
+[project.urls]
+Homepage = "https://github.com/MrYsLab/tmx-pico-aio"
+Issues = "https://github.com/MrYsLab/tmx-pico-aio/issues"
+
 dependencies = [
     "pyserial"
 ]
